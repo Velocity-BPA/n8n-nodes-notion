@@ -1,7 +1,7 @@
-# CLAUDE.md — n8n Community Node Development
+# CLAUDE.md
 
 ## Project Context
-This is an n8n community node package for **Notion** published to npm and the n8n marketplace.
+This is an n8n community node package for **Notion**.
 
 ## Quick Reference
 ```bash
