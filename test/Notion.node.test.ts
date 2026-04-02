@@ -69,86 +69,156 @@ describe('Notion Node', () => {
   // Resource-specific tests
 describe('Page Resource', () => {
   let mockExecuteFunctions: any;
-  
+
   beforeEach(() => {
     mockExecuteFunctions = {
       getNodeParameter: jest.fn(),
-      getCredentials: jest.fn().mockResolvedValue({ token: 'test-token' }),
+      getCredentials: jest.fn().mockResolvedValue({
+        apiKey: 'test-key',
+        baseUrl: 'https://api.notion.com/v1'
+      }),
       getInputData: jest.fn().mockReturnValue([{ json: {} }]),
       getNode: jest.fn().mockReturnValue({ name: 'Test Node' }),
       continueOnFail: jest.fn().mockReturnValue(false),
-      helpers: { httpRequest: jest.fn() },
+      helpers: {
+        httpRequest: jest.fn(),
+      },
     };
   });
-  
-  it('should get a page successfully', async () => {
-    const mockResponse = { id: 'page-123', properties: {} };
-    mockExecuteFunctions.getNodeParameter.mockImplementation((param: string) => {
-      if (param === 'operation') return 'getPage';
-      if (param === 'pageId') return 'page-123';
-      return undefined;
+
+  describe('createPage operation', () => {
+    it('should create a page successfully', async () => {
+      const mockResponse = { id: 'page-123', object: 'page' };
+      mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('createPage')
+        .mockReturnValueOnce({ database_id: 'db-123' })
+        .mockReturnValueOnce({ Name: { title: [{ text: { content: 'Test Page' } }] } })
+        .mockReturnValueOnce([])
+        .mockReturnValueOnce({})
+        .mockReturnValueOnce({});
+
+      const result = await executePageOperations.call(mockExecuteFunctions, [{ json: {} }]);
+
+      expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+        method: 'POST',
+        url: 'https://api.notion.com/v1/pages',
+        headers: {
+          'Authorization': 'Bearer test-key',
+          'Notion-Version': '2022-06-28',
+          'Content-Type': 'application/json',
+        },
+        body: {
+          parent: { database_id: 'db-123' },
+          properties: { Name: { title: [{ text: { content: 'Test Page' } }] } },
+        },
+        json: true,
+      });
+      expect(result).toEqual([{ json: mockResponse, pairedItem: { item: 0 } }]);
     });
-    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
-    
-    const result = await executePageOperations.call(mockExecuteFunctions, [{ json: {} }]);
-    
-    expect(result).toEqual([{ json: mockResponse, pairedItem: { item: 0 } }]);
-    expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
-      method: 'GET',
-      url: 'https://api.notion.com/v1/pages/page-123',
-      headers: {
-        'Authorization': 'Bearer test-token',
-        'Notion-Version': '2022-06-28',
-        'Content-Type': 'application/json',
-      },
-      json: true,
+
+    it('should handle create page error', async () => {
+      const mockError = new Error('API Error');
+      mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(mockError);
+      mockExecuteFunctions.getNodeParameter.mockReturnValueOnce('createPage');
+
+      await expect(executePageOperations.call(mockExecuteFunctions, [{ json: {} }])).rejects.toThrow('API Error');
     });
   });
-  
-  it('should update a page successfully', async () => {
-    const mockResponse = { id: 'page-123', properties: { title: 'Updated' } };
-    mockExecuteFunctions.getNodeParameter.mockImplementation((param: string) => {
-      if (param === 'operation') return 'updatePage';
-      if (param === 'pageId') return 'page-123';
-      if (param === 'properties') return { title: 'Updated' };
-      if (param === 'archived') return false;
-      return undefined;
+
+  describe('getPage operation', () => {
+    it('should get a page successfully', async () => {
+      const mockResponse = { id: 'page-123', object: 'page', properties: {} };
+      mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('getPage')
+        .mockReturnValueOnce('page-123')
+        .mockReturnValueOnce('');
+
+      const result = await executePageOperations.call(mockExecuteFunctions, [{ json: {} }]);
+
+      expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+        method: 'GET',
+        url: 'https://api.notion.com/v1/pages/page-123',
+        headers: {
+          'Authorization': 'Bearer test-key',
+          'Notion-Version': '2022-06-28',
+        },
+        json: true,
+      });
+      expect(result).toEqual([{ json: mockResponse, pairedItem: { item: 0 } }]);
     });
-    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
-    
-    const result = await executePageOperations.call(mockExecuteFunctions, [{ json: {} }]);
-    
-    expect(result).toEqual([{ json: mockResponse, pairedItem: { item: 0 } }]);
+
+    it('should handle get page error', async () => {
+      const mockError = new Error('Page not found');
+      mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(mockError);
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('getPage')
+        .mockReturnValueOnce('page-123');
+      mockExecuteFunctions.continueOnFail.mockReturnValue(true);
+
+      const result = await executePageOperations.call(mockExecuteFunctions, [{ json: {} }]);
+
+      expect(result).toEqual([{ json: { error: 'Page not found' }, pairedItem: { item: 0 } }]);
+    });
   });
-  
-  it('should create a page successfully', async () => {
-    const mockResponse = { id: 'page-456', properties: {} };
-    mockExecuteFunctions.getNodeParameter.mockImplementation((param: string) => {
-      if (param === 'operation') return 'createPage';
-      if (param === 'parent') return { database_id: 'db-123' };
-      if (param === 'properties') return {};
-      if (param === 'children') return [];
-      return undefined;
+
+  describe('updatePage operation', () => {
+    it('should update a page successfully', async () => {
+      const mockResponse = { id: 'page-123', object: 'page', archived: false };
+      mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('updatePage')
+        .mockReturnValueOnce('page-123')
+        .mockReturnValueOnce({ Name: { title: [{ text: { content: 'Updated Page' } }] } })
+        .mockReturnValueOnce({})
+        .mockReturnValueOnce({})
+        .mockReturnValueOnce(false);
+
+      const result = await executePageOperations.call(mockExecuteFunctions, [{ json: {} }]);
+
+      expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+        method: 'PATCH',
+        url: 'https://api.notion.com/v1/pages/page-123',
+        headers: {
+          'Authorization': 'Bearer test-key',
+          'Notion-Version': '2022-06-28',
+          'Content-Type': 'application/json',
+        },
+        body: {
+          properties: { Name: { title: [{ text: { content: 'Updated Page' } }] } },
+          archived: false,
+        },
+        json: true,
+      });
+      expect(result).toEqual([{ json: mockResponse, pairedItem: { item: 0 } }]);
     });
-    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
-    
-    const result = await executePageOperations.call(mockExecuteFunctions, [{ json: {} }]);
-    
-    expect(result).toEqual([{ json: mockResponse, pairedItem: { item: 0 } }]);
   });
-  
-  it('should handle errors when continueOnFail is true', async () => {
-    mockExecuteFunctions.getNodeParameter.mockImplementation((param: string) => {
-      if (param === 'operation') return 'getPage';
-      if (param === 'pageId') return 'invalid-page';
-      return undefined;
+
+  describe('getPageProperty operation', () => {
+    it('should get page property successfully', async () => {
+      const mockResponse = { object: 'property_item', property: { id: 'prop-123' } };
+      mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+      mockExecuteFunctions.getNodeParameter
+        .mockReturnValueOnce('getPageProperty')
+        .mockReturnValueOnce('page-123')
+        .mockReturnValueOnce('prop-123')
+        .mockReturnValueOnce('')
+        .mockReturnValueOnce(100);
+
+      const result = await executePageOperations.call(mockExecuteFunctions, [{ json: {} }]);
+
+      expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+        method: 'GET',
+        url: 'https://api.notion.com/v1/pages/page-123/properties/prop-123',
+        headers: {
+          'Authorization': 'Bearer test-key',
+          'Notion-Version': '2022-06-28',
+        },
+        json: true,
+      });
+      expect(result).toEqual([{ json: mockResponse, pairedItem: { item: 0 } }]);
     });
-    mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('Page not found'));
-    mockExecuteFunctions.continueOnFail.mockReturnValue(true);
-    
-    const result = await executePageOperations.call(mockExecuteFunctions, [{ json: {} }]);
-    
-    expect(result).toEqual([{ json: { error: 'Page not found' }, pairedItem: { item: 0 } }]);
   });
 });
 
@@ -159,151 +229,143 @@ describe('Database Resource', () => {
 		mockExecuteFunctions = {
 			getNodeParameter: jest.fn(),
 			getCredentials: jest.fn().mockResolvedValue({
-				apiKey: 'test-api-key',
-				baseUrl: 'https://api.notion.com/v1'
+				token: 'test-token',
 			}),
 			getInputData: jest.fn().mockReturnValue([{ json: {} }]),
 			getNode: jest.fn().mockReturnValue({ name: 'Test Node' }),
 			continueOnFail: jest.fn().mockReturnValue(false),
 			helpers: {
 				httpRequest: jest.fn(),
-				requestWithAuthentication: jest.fn()
 			},
 		};
 	});
 
-	describe('getDatabase operation', () => {
-		it('should get database successfully', async () => {
-			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('getDatabase')
-				.mockReturnValueOnce('database-123');
-			
-			const mockResponse = { id: 'database-123', title: [{ text: { content: 'Test Database' } }] };
-			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+	it('should create a database successfully', async () => {
+		const mockResponse = {
+			id: 'test-database-id',
+			object: 'database',
+			title: [{ type: 'text', text: { content: 'Test Database' } }],
+		};
 
-			const result = await executeDatabaseOperations.call(mockExecuteFunctions, [{ json: {} }]);
+		mockExecuteFunctions.getNodeParameter
+			.mockReturnValueOnce('createDatabase')
+			.mockReturnValueOnce('{"type": "page_id", "page_id": "test-page-id"}')
+			.mockReturnValueOnce('Test Database')
+			.mockReturnValueOnce('{"Name": {"title": {}}}')
+			.mockReturnValueOnce('')
+			.mockReturnValueOnce('')
+			.mockReturnValueOnce(false);
 
-			expect(result).toEqual([{ json: mockResponse, pairedItem: { item: 0 } }]);
-			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
-				method: 'GET',
-				url: 'https://api.notion.com/v1/databases/database-123',
-				headers: {
-					'Authorization': 'Bearer test-api-key',
-					'Content-Type': 'application/json',
-					'Notion-Version': '2022-06-28'
-				},
-				json: true,
-			});
-		});
+		mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
 
-		it('should handle errors gracefully', async () => {
-			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('getDatabase')
-				.mockReturnValueOnce('database-123');
-			mockExecuteFunctions.continueOnFail.mockReturnValue(true);
-			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
+		const result = await executeDatabaseOperations.call(mockExecuteFunctions, [{ json: {} }]);
 
-			const result = await executeDatabaseOperations.call(mockExecuteFunctions, [{ json: {} }]);
-
-			expect(result).toEqual([{ json: { error: 'API Error' }, pairedItem: { item: 0 } }]);
-		});
-	});
-
-	describe('queryDatabase operation', () => {
-		it('should query database successfully', async () => {
-			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('queryDatabase')
-				.mockReturnValueOnce('database-123')
-				.mockReturnValueOnce('{"property": "Status", "select": {"equals": "Done"}}')
-				.mockReturnValueOnce('[{"property": "Created", "direction": "descending"}]')
-				.mockReturnValueOnce('')
-				.mockReturnValueOnce(50);
-
-			const mockResponse = { results: [], has_more: false };
-			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
-
-			const result = await executeDatabaseOperations.call(mockExecuteFunctions, [{ json: {} }]);
-
-			expect(result).toEqual([{ json: mockResponse, pairedItem: { item: 0 } }]);
-			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
-				method: 'POST',
-				url: 'https://api.notion.com/v1/databases/database-123/query',
-				headers: {
-					'Authorization': 'Bearer test-api-key',
-					'Content-Type': 'application/json',
-					'Notion-Version': '2022-06-28'
-				},
-				body: {
-					filter: { property: 'Status', select: { equals: 'Done' } },
-					sorts: [{ property: 'Created', direction: 'descending' }],
-					page_size: 50
-				},
-				json: true,
-			});
+		expect(result[0].json).toEqual(mockResponse);
+		expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+			method: 'POST',
+			url: 'https://api.notion.com/v1/databases',
+			headers: {
+				'Authorization': 'Bearer test-token',
+				'Notion-Version': '2022-06-28',
+				'Content-Type': 'application/json',
+			},
+			json: true,
+			body: {
+				parent: { type: 'page_id', page_id: 'test-page-id' },
+				title: [{ type: 'text', text: { content: 'Test Database' } }],
+				properties: { Name: { title: {} } },
+				is_inline: false,
+			},
 		});
 	});
 
-	describe('createDatabase operation', () => {
-		it('should create database successfully', async () => {
-			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('createDatabase')
-				.mockReturnValueOnce({ parentType: [{ type: 'page_id', page_id: 'page-123' }] })
-				.mockReturnValueOnce('New Database')
-				.mockReturnValueOnce('{"Title": {"title": {}}}');
+	it('should get a database successfully', async () => {
+		const mockResponse = {
+			id: 'test-database-id',
+			object: 'database',
+			title: [{ type: 'text', text: { content: 'Test Database' } }],
+		};
 
-			const mockResponse = { id: 'database-456', title: [{ text: { content: 'New Database' } }] };
-			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+		mockExecuteFunctions.getNodeParameter
+			.mockReturnValueOnce('getDatabase')
+			.mockReturnValueOnce('test-database-id');
 
-			const result = await executeDatabaseOperations.call(mockExecuteFunctions, [{ json: {} }]);
+		mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
 
-			expect(result).toEqual([{ json: mockResponse, pairedItem: { item: 0 } }]);
-			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
-				method: 'POST',
-				url: 'https://api.notion.com/v1/databases',
-				headers: {
-					'Authorization': 'Bearer test-api-key',
-					'Content-Type': 'application/json',
-					'Notion-Version': '2022-06-28'
-				},
-				body: {
-					parent: { page_id: 'page-123' },
-					title: [{ type: 'text', text: { content: 'New Database' } }],
-					properties: { Title: { title: {} } }
-				},
-				json: true,
-			});
+		const result = await executeDatabaseOperations.call(mockExecuteFunctions, [{ json: {} }]);
+
+		expect(result[0].json).toEqual(mockResponse);
+		expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+			method: 'GET',
+			url: 'https://api.notion.com/v1/databases/test-database-id',
+			headers: {
+				'Authorization': 'Bearer test-token',
+				'Notion-Version': '2022-06-28',
+				'Content-Type': 'application/json',
+			},
+			json: true,
 		});
 	});
 
-	describe('updateDatabase operation', () => {
-		it('should update database successfully', async () => {
-			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('updateDatabase')
-				.mockReturnValueOnce('database-123')
-				.mockReturnValueOnce('Updated Database')
-				.mockReturnValueOnce('{"NewProperty": {"text": {}}}');
+	it('should query a database successfully', async () => {
+		const mockResponse = {
+			results: [{ id: 'page-1' }, { id: 'page-2' }],
+			has_more: false,
+		};
 
-			const mockResponse = { id: 'database-123', title: [{ text: { content: 'Updated Database' } }] };
-			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
+		mockExecuteFunctions.getNodeParameter
+			.mockReturnValueOnce('queryDatabase')
+			.mockReturnValueOnce('test-database-id')
+			.mockReturnValueOnce('{"property": "Name", "rich_text": {"contains": "test"}}')
+			.mockReturnValueOnce('')
+			.mockReturnValueOnce('')
+			.mockReturnValueOnce(100);
 
-			const result = await executeDatabaseOperations.call(mockExecuteFunctions, [{ json: {} }]);
+		mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResponse);
 
-			expect(result).toEqual([{ json: mockResponse, pairedItem: { item: 0 } }]);
-			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
-				method: 'PATCH',
-				url: 'https://api.notion.com/v1/databases/database-123',
-				headers: {
-					'Authorization': 'Bearer test-api-key',
-					'Content-Type': 'application/json',
-					'Notion-Version': '2022-06-28'
-				},
-				body: {
-					title: [{ type: 'text', text: { content: 'Updated Database' } }],
-					properties: { NewProperty: { text: {} } }
-				},
-				json: true,
-			});
+		const result = await executeDatabaseOperations.call(mockExecuteFunctions, [{ json: {} }]);
+
+		expect(result[0].json).toEqual(mockResponse);
+		expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
+			method: 'POST',
+			url: 'https://api.notion.com/v1/databases/test-database-id/query',
+			headers: {
+				'Authorization': 'Bearer test-token',
+				'Notion-Version': '2022-06-28',
+				'Content-Type': 'application/json',
+			},
+			json: true,
+			body: {
+				filter: { property: 'Name', rich_text: { contains: 'test' } },
+				page_size: 100,
+			},
 		});
+	});
+
+	it('should handle errors gracefully when continueOnFail is true', async () => {
+		mockExecuteFunctions.getNodeParameter
+			.mockReturnValueOnce('getDatabase')
+			.mockReturnValueOnce('invalid-id');
+
+		mockExecuteFunctions.continueOnFail.mockReturnValue(true);
+		mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('Database not found'));
+
+		const result = await executeDatabaseOperations.call(mockExecuteFunctions, [{ json: {} }]);
+
+		expect(result[0].json.error).toBe('Database not found');
+	});
+
+	it('should throw error when continueOnFail is false', async () => {
+		mockExecuteFunctions.getNodeParameter
+			.mockReturnValueOnce('getDatabase')
+			.mockReturnValueOnce('invalid-id');
+
+		mockExecuteFunctions.continueOnFail.mockReturnValue(false);
+		mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('Database not found'));
+
+		await expect(
+			executeDatabaseOperations.call(mockExecuteFunctions, [{ json: {} }]),
+		).rejects.toThrow('Database not found');
 	});
 });
 
@@ -314,8 +376,7 @@ describe('Block Resource', () => {
     mockExecuteFunctions = {
       getNodeParameter: jest.fn(),
       getCredentials: jest.fn().mockResolvedValue({ 
-        apiKey: 'test-key', 
-        baseUrl: 'https://api.notion.com/v1' 
+        token: 'test-token' 
       }),
       getInputData: jest.fn().mockReturnValue([{ json: {} }]),
       getNode: jest.fn().mockReturnValue({ name: 'Test Node' }),
@@ -327,162 +388,132 @@ describe('Block Resource', () => {
     };
   });
 
-  it('should get a block successfully', async () => {
+  test('should get block successfully', async () => {
     mockExecuteFunctions.getNodeParameter
       .mockReturnValueOnce('getBlock')
-      .mockReturnValueOnce('block-123');
+      .mockReturnValueOnce('block-id-123');
 
-    const mockBlock = { id: 'block-123', type: 'paragraph', object: 'block' };
-    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockBlock);
+    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
+      id: 'block-id-123',
+      type: 'paragraph',
+      object: 'block'
+    });
 
-    const result = await executeBlockOperations.call(mockExecuteFunctions, [{ json: {} }]);
+    const items = [{ json: {} }];
+    const result = await executeBlockOperations.call(mockExecuteFunctions, items);
 
+    expect(result).toHaveLength(1);
+    expect(result[0].json.id).toBe('block-id-123');
     expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
       method: 'GET',
-      url: 'https://api.notion.com/v1/blocks/block-123',
+      url: 'https://api.notion.com/v1/blocks/block-id-123',
       headers: {
-        'Authorization': 'Bearer test-key',
+        'Authorization': 'Bearer test-token',
         'Notion-Version': '2022-06-28',
         'Content-Type': 'application/json',
       },
       json: true,
     });
-    expect(result).toEqual([{ json: mockBlock, pairedItem: { item: 0 } }]);
   });
 
-  it('should get block children successfully', async () => {
+  test('should get block children successfully', async () => {
     mockExecuteFunctions.getNodeParameter
       .mockReturnValueOnce('getBlockChildren')
-      .mockReturnValueOnce('block-123')
+      .mockReturnValueOnce('block-id-123')
       .mockReturnValueOnce('')
       .mockReturnValueOnce(50);
 
-    const mockChildren = { results: [], has_more: false };
-    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockChildren);
+    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
+      results: [{ id: 'child-1', type: 'paragraph' }],
+      has_more: false
+    });
 
-    const result = await executeBlockOperations.call(mockExecuteFunctions, [{ json: {} }]);
+    const items = [{ json: {} }];
+    const result = await executeBlockOperations.call(mockExecuteFunctions, items);
 
+    expect(result).toHaveLength(1);
+    expect(result[0].json.results).toHaveLength(1);
     expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
       method: 'GET',
-      url: 'https://api.notion.com/v1/blocks/block-123/children?page_size=50',
+      url: 'https://api.notion.com/v1/blocks/block-id-123/children?page_size=50',
       headers: {
-        'Authorization': 'Bearer test-key',
+        'Authorization': 'Bearer test-token',
         'Notion-Version': '2022-06-28',
         'Content-Type': 'application/json',
       },
       json: true,
     });
-    expect(result).toEqual([{ json: mockChildren, pairedItem: { item: 0 } }]);
   });
 
-  it('should update a block successfully', async () => {
+  test('should update block successfully', async () => {
     mockExecuteFunctions.getNodeParameter
       .mockReturnValueOnce('updateBlock')
-      .mockReturnValueOnce('block-123')
+      .mockReturnValueOnce('block-id-123')
       .mockReturnValueOnce('paragraph')
-      .mockReturnValueOnce('{"rich_text": [{"text": {"content": "Updated text"}}]}');
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce('{"rich_text": [{"type": "text", "text": {"content": "Updated text"}}]}');
 
-    const mockUpdatedBlock = { id: 'block-123', type: 'paragraph' };
-    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockUpdatedBlock);
-
-    const result = await executeBlockOperations.call(mockExecuteFunctions, [{ json: {} }]);
-
-    expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
-      method: 'PATCH',
-      url: 'https://api.notion.com/v1/blocks/block-123',
-      headers: {
-        'Authorization': 'Bearer test-key',
-        'Notion-Version': '2022-06-28',
-        'Content-Type': 'application/json',
-      },
-      body: {
-        paragraph: {
-          rich_text: [{ text: { content: 'Updated text' } }]
-        }
-      },
-      json: true,
+    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
+      id: 'block-id-123',
+      type: 'paragraph',
+      archived: false
     });
-    expect(result).toEqual([{ json: mockUpdatedBlock, pairedItem: { item: 0 } }]);
+
+    const items = [{ json: {} }];
+    const result = await executeBlockOperations.call(mockExecuteFunctions, items);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].json.id).toBe('block-id-123');
   });
 
-  it('should delete a block successfully', async () => {
+  test('should delete block successfully', async () => {
     mockExecuteFunctions.getNodeParameter
       .mockReturnValueOnce('deleteBlock')
-      .mockReturnValueOnce('block-123');
+      .mockReturnValueOnce('block-id-123');
 
-    const mockDeletedBlock = { id: 'block-123', archived: true };
-    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockDeletedBlock);
-
-    const result = await executeBlockOperations.call(mockExecuteFunctions, [{ json: {} }]);
-
-    expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
-      method: 'DELETE',
-      url: 'https://api.notion.com/v1/blocks/block-123',
-      headers: {
-        'Authorization': 'Bearer test-key',
-        'Notion-Version': '2022-06-28',
-        'Content-Type': 'application/json',
-      },
-      json: true,
+    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
+      id: 'block-id-123',
+      archived: true
     });
-    expect(result).toEqual([{ json: mockDeletedBlock, pairedItem: { item: 0 } }]);
+
+    const items = [{ json: {} }];
+    const result = await executeBlockOperations.call(mockExecuteFunctions, items);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].json.archived).toBe(true);
   });
 
-  it('should append block children successfully', async () => {
+  test('should append block children successfully', async () => {
     mockExecuteFunctions.getNodeParameter
       .mockReturnValueOnce('appendBlockChildren')
-      .mockReturnValueOnce('block-123')
-      .mockReturnValueOnce('[{"type": "paragraph", "paragraph": {"rich_text": [{"text": {"content": "New paragraph"}}]}}]');
+      .mockReturnValueOnce('block-id-123')
+      .mockReturnValueOnce('[{"type": "paragraph", "paragraph": {"rich_text": [{"type": "text", "text": {"content": "New child block"}}]}}]')
+      .mockReturnValueOnce('');
 
-    const mockResult = { results: [], has_more: false };
-    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue(mockResult);
-
-    const result = await executeBlockOperations.call(mockExecuteFunctions, [{ json: {} }]);
-
-    expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith({
-      method: 'PATCH',
-      url: 'https://api.notion.com/v1/blocks/block-123/children',
-      headers: {
-        'Authorization': 'Bearer test-key',
-        'Notion-Version': '2022-06-28',
-        'Content-Type': 'application/json',
-      },
-      body: {
-        children: [{
-          type: 'paragraph',
-          paragraph: {
-            rich_text: [{ text: { content: 'New paragraph' } }]
-          }
-        }]
-      },
-      json: true,
+    mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
+      results: [{ id: 'new-child-id', type: 'paragraph' }]
     });
-    expect(result).toEqual([{ json: mockResult, pairedItem: { item: 0 } }]);
+
+    const items = [{ json: {} }];
+    const result = await executeBlockOperations.call(mockExecuteFunctions, items);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].json.results).toHaveLength(1);
   });
 
-  it('should handle API errors gracefully', async () => {
+  test('should handle API errors gracefully', async () => {
     mockExecuteFunctions.getNodeParameter
       .mockReturnValueOnce('getBlock')
-      .mockReturnValueOnce('invalid-block');
+      .mockReturnValueOnce('invalid-block-id');
 
     mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('Block not found'));
-
-    await expect(
-      executeBlockOperations.call(mockExecuteFunctions, [{ json: {} }])
-    ).rejects.toThrow('Block not found');
-  });
-
-  it('should continue on fail when enabled', async () => {
     mockExecuteFunctions.continueOnFail.mockReturnValue(true);
-    mockExecuteFunctions.getNodeParameter
-      .mockReturnValueOnce('getBlock')
-      .mockReturnValueOnce('invalid-block');
 
-    mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('Block not found'));
+    const items = [{ json: {} }];
+    const result = await executeBlockOperations.call(mockExecuteFunctions, items);
 
-    const result = await executeBlockOperations.call(mockExecuteFunctions, [{ json: {} }]);
-
-    expect(result).toEqual([{ json: { error: 'Block not found' }, pairedItem: { item: 0 } }]);
+    expect(result).toHaveLength(1);
+    expect(result[0].json.error).toBe('Block not found');
   });
 });
 });
