@@ -8,24 +8,25 @@
 >
 > For licensing information, visit https://velobpa.com/licensing or contact licensing@velobpa.com.
 
-This n8n community node provides comprehensive integration with Notion's API, enabling you to work with 3 core resources: Pages, Databases, and Blocks. Automate content creation, database management, and block-level operations within your Notion workspace through powerful n8n workflows.
+A comprehensive n8n community node for Notion integration with 3 resources (Page, Database, Block) that enables seamless automation of content management, database operations, and workspace organization within your n8n workflows.
 
 ![n8n Community Node](https://img.shields.io/badge/n8n-Community%20Node-blue)
 ![License](https://img.shields.io/badge/license-BSL--1.1-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue)
-![Notion API](https://img.shields.io/badge/Notion-API%20v1-black)
-![Pages](https://img.shields.io/badge/Resources-Pages%7CDatabases%7CBlocks-green)
+![Notion API](https://img.shields.io/badge/Notion%20API-2022--06--28-black)
+![Node.js](https://img.shields.io/badge/Node.js-18+-green)
+![Documentation](https://img.shields.io/badge/docs-complete-brightgreen)
 
 ## Features
 
-- **Page Management** - Create, retrieve, update, and delete Notion pages with full property support
-- **Database Operations** - Query databases, create entries, update records, and manage database schemas
-- **Block Manipulation** - Read, create, update, and delete blocks with support for all block types
-- **Rich Content Support** - Handle rich text, media embeds, callouts, code blocks, and complex formatting
-- **Property Handling** - Full support for all Notion property types including relations, formulas, and rollups
-- **Batch Operations** - Efficiently process multiple items with built-in pagination and rate limiting
-- **Error Recovery** - Robust error handling with automatic retries and detailed error reporting
-- **Type Safety** - Complete TypeScript implementation with full type definitions
+- **Page Management** - Create, retrieve, update, and archive Notion pages with full property support
+- **Database Operations** - Query databases, create records, update entries, and manage database schemas
+- **Block Manipulation** - Add, update, delete, and retrieve blocks for rich content creation
+- **Rich Content Support** - Handle text formatting, embeds, files, and multimedia content
+- **Property Handling** - Support for all Notion property types including relations, formulas, and rollups
+- **Bulk Operations** - Efficient batch processing for large-scale data operations
+- **Error Recovery** - Robust error handling with automatic retry mechanisms
+- **Type Safety** - Full TypeScript implementation with comprehensive type definitions
 
 ## Installation
 
@@ -60,7 +61,8 @@ n8n start
 
 | Field | Description | Required |
 |-------|-------------|----------|
-| API Key | Your Notion integration token from the Notion developer portal | Yes |
+| API Key | Your Notion integration token from https://www.notion.so/my-integrations | Yes |
+| Environment | API environment (defaults to production) | No |
 
 ## Resources & Operations
 
@@ -68,40 +70,31 @@ n8n start
 
 | Operation | Description |
 |-----------|-------------|
-| Create | Create a new page in a database or as a child page |
-| Get | Retrieve a page by ID with all properties |
-| Update | Update page properties and content |
-| Delete | Move a page to trash |
-| Search | Search for pages across your workspace |
-| Get Properties | Retrieve all properties of a page |
-| Archive | Archive a page |
-| Restore | Restore an archived page |
+| Create | Create a new page with specified properties and content |
+| Get | Retrieve page details including properties and metadata |
+| Update | Update page properties, title, and archived status |
+| Archive | Archive a page (set archived status to true) |
+| Get All | List all pages accessible by the integration |
 
 ### 2. Database
 
 | Operation | Description |
 |-----------|-------------|
-| Create | Create a new database with custom properties |
-| Get | Retrieve database schema and metadata |
-| Update | Update database title and properties |
-| Query | Query database entries with filters and sorting |
-| List | List all databases in workspace |
-| Create Entry | Add a new entry to a database |
-| Update Entry | Update an existing database entry |
-| Delete Entry | Remove an entry from a database |
+| Query | Query database entries with filters, sorts, and pagination |
+| Create | Create a new database with specified schema and properties |
+| Update | Update database title, description, and properties |
+| Get | Retrieve database schema and configuration details |
+| Get All | List all databases accessible by the integration |
 
 ### 3. Block
 
 | Operation | Description |
 |-----------|-------------|
-| Get | Retrieve a block by ID |
-| Update | Update block content and properties |
-| Delete | Delete a block |
+| Append | Append new blocks to a page or existing block |
+| Get | Retrieve block content and metadata |
+| Update | Update block content and formatting |
+| Delete | Delete a block from a page |
 | Get Children | Get all child blocks of a parent block |
-| Append Children | Add new blocks as children |
-| Create | Create a new block |
-| Move | Move a block to a different parent |
-| Duplicate | Duplicate a block and its children |
 
 ## Usage Examples
 
@@ -112,19 +105,11 @@ n8n start
     "database_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
   },
   "properties": {
-    "Title": {
-      "title": [
-        {
-          "text": {
-            "content": "New Project Proposal"
-          }
-        }
-      ]
+    "Name": {
+      "title": [{"text": {"content": "New Project"}}]
     },
     "Status": {
-      "select": {
-        "name": "In Progress"
-      }
+      "select": {"name": "In Progress"}
     }
   }
 }
@@ -133,21 +118,12 @@ n8n start
 ```javascript
 // Query database with filters
 {
+  "database_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "filter": {
-    "and": [
-      {
-        "property": "Status",
-        "select": {
-          "equals": "In Progress"
-        }
-      },
-      {
-        "property": "Priority",
-        "select": {
-          "equals": "High"
-        }
-      }
-    ]
+    "property": "Status",
+    "select": {
+      "equals": "Done"
+    }
   },
   "sorts": [
     {
@@ -161,33 +137,13 @@ n8n start
 ```javascript
 // Append blocks to a page
 {
+  "block_id": "page_id_here",
   "children": [
-    {
-      "object": "block",
-      "type": "heading_2",
-      "heading_2": {
-        "rich_text": [
-          {
-            "type": "text",
-            "text": {
-              "content": "Project Overview"
-            }
-          }
-        ]
-      }
-    },
     {
       "object": "block",
       "type": "paragraph",
       "paragraph": {
-        "rich_text": [
-          {
-            "type": "text",
-            "text": {
-              "content": "This project aims to improve our automation workflows."
-            }
-          }
-        ]
+        "rich_text": [{"text": {"content": "This is a new paragraph."}}]
       }
     }
   ]
@@ -197,25 +153,13 @@ n8n start
 ```javascript
 // Update page properties
 {
+  "page_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "properties": {
     "Status": {
-      "select": {
-        "name": "Completed"
-      }
+      "select": {"name": "Completed"}
     },
-    "Completion Date": {
-      "date": {
-        "start": "2024-01-15"
-      }
-    },
-    "Notes": {
-      "rich_text": [
-        {
-          "text": {
-            "content": "Project completed successfully ahead of schedule."
-          }
-        }
-      ]
+    "Last Updated": {
+      "date": {"start": "2024-01-15"}
     }
   }
 }
@@ -225,12 +169,12 @@ n8n start
 
 | Error | Description | Solution |
 |-------|-------------|----------|
-| 401 Unauthorized | Invalid or missing API key | Verify your Notion integration token in credentials |
-| 403 Forbidden | Insufficient permissions | Ensure integration has access to the requested resource |
-| 404 Not Found | Page, database, or block doesn't exist | Check the ID and ensure the resource exists |
-| 429 Rate Limited | Too many requests | Node automatically retries with exponential backoff |
-| 400 Bad Request | Invalid request format or parameters | Check request body format and required fields |
-| 500 Internal Error | Notion server error | Retry the operation or check Notion status page |
+| 401 Unauthorized | Invalid or missing API key | Verify API token in credentials and ensure integration has proper permissions |
+| 404 Not Found | Page, database, or block doesn't exist | Check resource ID and ensure integration has access to the workspace |
+| 400 Bad Request | Invalid request format or missing required fields | Validate request parameters and property types |
+| 429 Rate Limited | Too many requests in a short period | Implement exponential backoff and reduce request frequency |
+| 403 Forbidden | Insufficient permissions for the operation | Grant necessary permissions to the integration in Notion |
+| 500 Internal Server Error | Notion API service error | Retry the request after a brief delay or check Notion status page |
 
 ## Development
 
