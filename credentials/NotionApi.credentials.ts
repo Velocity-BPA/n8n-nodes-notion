@@ -6,16 +6,18 @@ import {
 export class NotionApi implements ICredentialType {
 	name = 'notionApi';
 	displayName = 'Notion API';
-	documentationUrl = 'https://developers.notion.com/docs/authorization';
+	documentationUrl = 'https://developers.notion.com/docs/getting-started';
 	properties: INodeProperties[] = [
 		{
-			displayName: 'API Token',
-			name: 'apiToken',
+			displayName: 'Bearer Token',
+			name: 'token',
 			type: 'string',
-			typeOptions: { password: true },
+			typeOptions: {
+				password: true,
+			},
 			default: '',
 			required: true,
-			description: 'The API token for your Notion integration. Create an integration in your Notion workspace settings to get this token.',
+			description: 'The Bearer token for your Notion integration. Create an internal integration in your Notion workspace settings to get this token.',
 		},
 		{
 			displayName: 'API Base URL',
